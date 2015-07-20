@@ -10,13 +10,16 @@ package bagins
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/APTrust/bagins/bagutil"
 	"hash"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -137,25 +140,40 @@ func (m *Manifest) Create() error {
 	defer fileOut.Close()
 
 	// Write fields and data to the file.
-	for fName, ckSum := range m.Data {
-		_, err := fmt.Fprintln(fileOut, ckSum, fName)
-		if err != nil {
-			return errors.New("Error writing line to manifest: " + err.Error())
+	m.Write(fileOut)
+	/*
+		for fName, ckSum := range m.Data {
+			_, err := fmt.Fprintln(fileOut, ckSum, fName)
+			if err != nil {
+				return errors.New("Error writing line to manifest: " + err.Error())
+			}
 		}
-	}
+	*/
 	return nil
 }
 
 // Returns the contents of the manifest in the form of a string.
 // Useful if you don't want to write directly to disk.
 func (m *Manifest) ToString() string {
-	str := ""
-	for fName, ckSum := range m.Data {
-		str += fmt.Sprintf("%s %s\n", ckSum, fName)
-	}
-	return str
+	buf := bytes.NewBuffer(nil)
+	m.Write(buf)
+	return buf.String()
 }
 
+func (m *Manifest) Write(w io.Writer) error {
+	keys := []string{}
+	for fName, _ := range m.Data {
+		keys = append(keys, fName)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		io.WriteString(w, m.Data[key])
+		io.WriteString(w, " ")
+		io.WriteString(w, key)
+		io.WriteString(w, "\n")
+	}
+	return nil
+}
 
 // Returns a sting of the filename for this manifest file based on Path, BaseName and Algo
 func (m *Manifest) Name() string {
@@ -178,9 +196,13 @@ func parseAlgoName(name string) (string, error) {
 	return algo, nil
 }
 
+func ParseManifestData(file io.Reader) (map[string]string, []error) {
+	return parseManifestData(file)
+}
+
 // Reads the contents of file and parses checksum and file information in manifest format as
 // per the bagit specification.
-func parseManifestData(file *os.File) (map[string]string, []error) {
+func parseManifestData(file io.Reader) (map[string]string, []error) {
 	var errs []error
 	// See regexp examples at http://play.golang.org/p/_msLJ-lBEu
 	// Regex matches these reqs from the bagit spec: "One or

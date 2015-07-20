@@ -19,10 +19,12 @@ package bagins
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Represents the basic structure of a bag which is controlled by methods.
@@ -220,6 +222,98 @@ func (b *Bag) AddTagfile(name string) error {
 	}
 	b.tagfiles[name] = tf
 	if err := tf.Create(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Adds a group of files as tag files, this will throw an error if the file
+// already exists.
+func (b *Bag) AddTagDir(src string, dstDir string) (errs []error) {
+	//fxs := make(map[string]string)
+
+	// Collect files to add in scr directory.
+	var files []string
+	visit := func(pth string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, pth)
+		}
+		return err
+	}
+
+	if err := filepath.Walk(src, visit); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Perform Payload.Add on each file found in src under a goroutine.
+	queue := make(chan bool, 5)
+	wg := sync.WaitGroup{}
+	for idx := range files {
+		queue <- true
+		wg.Add(1)
+		go func(srcPath string, src string) {
+			dstPath := filepath.Join(dstDir, strings.TrimPrefix(srcPath, src))
+			// Copy in the file
+			err := b.AddGenericTagFile(srcPath, dstPath)
+			if err != nil {
+				errs = append(errs, err)
+			}
+			//fxs[dstPath] = fx
+			<-queue
+			wg.Done()
+		}(files[idx], src)
+	}
+
+	wg.Wait()
+
+	return
+}
+
+// Adds the file at srcPath to the payload directory as dstPath and returns
+// a checksum value as calulated by the provided hash.  Returns the checksum
+// string and any error encountered
+func (b *Bag) AddGenericTagFile(srcPath string, dstPath string) error {
+	dstFile := filepath.Join(b.pth, dstPath)
+
+	if _, err := os.Stat(dstFile); err == nil {
+		// return file exists error
+		return fmt.Errorf("generic tag file already exists, can't overwrite (%s)", dstFile)
+	}
+
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	absSrcPath, err := filepath.Abs(srcPath)
+	if err != nil {
+		return err
+	}
+	absDestPath, err := filepath.Abs(dstFile)
+	if err != nil {
+		return err
+	}
+
+	// If src and dst are the same, copying with destroy the src.
+	// Just compute the hash.
+	if absSrcPath == absDestPath {
+		return nil
+	}
+
+	// TODO simplify this! returns on windows paths are messing with me so I'm
+	// going through this step wise.
+	if err := os.MkdirAll(filepath.Dir(dstFile), 0766); err != nil {
+		return err
+	}
+	dst, err := os.Create(dstFile)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
 		return err
 	}
 	return nil
