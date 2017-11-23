@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 // Payloads describes a filepath location to serve as the data directory of
@@ -91,7 +90,7 @@ func (p *Payload) Add(srcPath string, dstPath string, m *Manifest) (string, erro
 // Performs an add on every file under the directory supplied to the
 // method.  Returns a map of the filenames and its fixity value based
 // on the hash function passed and a slice of errors if there were any.
-func (p *Payload) AddAll(src string, m *Manifest) (fxs map[string]string, errs []error) {
+func (p *Payload) AddAll(src string, manifests *Manifest) (fxs map[string]string, errs []error) {
 
 	fxs = make(map[string]string)
 
@@ -108,24 +107,36 @@ func (p *Payload) AddAll(src string, m *Manifest) (fxs map[string]string, errs [
 		errs = append(errs, err)
 	}
 	// Perform Payload.Add on each file found in src under a goroutine.
-	queue := make(chan bool, 5)
-	wg := sync.WaitGroup{}
-	for idx := range files {
-		queue <- true
-		wg.Add(1)
-		go func(file string, src string, m *Manifest) {
-			dstPath := strings.TrimPrefix(file, src)
-			fx, err := p.Add(file, dstPath, m)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			fxs[dstPath] = fx
-			<-queue
-			wg.Done()
-		}(files[idx], src, m)
+
+	for _, file := range files {
+		dstPath := strings.TrimPrefix(file, src)
+		fixities, err := p.Add(file, dstPath, manifests)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		fxs[dstPath] = fixities
 	}
 
-	wg.Wait()
+	/*
+		queue := make(chan bool, 5)
+		wg := sync.WaitGroup{}
+		for idx := range files {
+			queue <- true
+			wg.Add(1)
+			go func(file string, src string, m *Manifest) {
+				dstPath := strings.TrimPrefix(file, src)
+				fx, err := p.Add(file, dstPath, m)
+				if err != nil {
+					errs = append(errs, err)
+				}
+				fxs[dstPath] = fx
+				<-queue
+				wg.Done()
+			}(files[idx], src, m)
+		}
+
+		wg.Wait()
+	*/
 
 	return
 }

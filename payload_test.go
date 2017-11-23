@@ -2,8 +2,8 @@ package bagins_test
 
 import (
 	"crypto/md5"
-	"github.com/APTrust/bagins"
-	"github.com/APTrust/bagins/bagutil"
+	"github.com/verisart/bagins"
+	"github.com/verisart/bagins/bagutil"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -105,7 +105,6 @@ func TestPayloadAddInPlace(t *testing.T) {
 		t.Error("Checksum", chkSum, "did not match", exp)
 	}
 }
-
 
 func TestPayloadAddAll(t *testing.T) {
 	// Setup directories to test on

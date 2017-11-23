@@ -3,7 +3,7 @@ package bagins_test
 
 import (
 	"fmt"
-	"github.com/APTrust/bagins"
+	"github.com/verisart/bagins"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -229,7 +229,6 @@ func TestTagFileToString(t *testing.T) {
 	tagFile.Data.AddField(*bagins.NewTagField("BagIt-Version", "0.97"))
 	tagFile.Data.AddField(*bagins.NewTagField("Tag-File-Character-Encoding", "UTF-8"))
 	tagFile.Data.AddField(*bagins.NewTagField("Long-Line", "A metadata element MUST consist of a label, a colon, and a value, each separated by optional whitespace.  It is RECOMMENDED that lines not exceed 79 characters in length.  Long values may be continued onto the next line by inserting a newline (LF), a carriage return (CR), or carriage return plus newline (CRLF) and indenting the next line with linear white space (spaces or tabs)."))
-
 
 	str, err := tagFile.ToString()
 	if err != nil {

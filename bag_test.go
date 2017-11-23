@@ -2,7 +2,7 @@ package bagins_test
 
 import (
 	"fmt"
-	"github.com/APTrust/bagins"
+	"github.com/verisart/bagins"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -273,7 +273,11 @@ func TestAddDir(t *testing.T) {
 	defer os.RemoveAll(srcDir)
 
 	// Setup the test bag
-	bag, _ := setupTestBag("_GOTEST_BAG_ADDDIR_")
+	bag, err := setupTestBag("_GOTEST_BAG_ADDDIR_")
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
 	defer os.RemoveAll(bag.Path())
 
 	// It should produce no errors
